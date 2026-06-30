@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      PORT: "${PORT:-3000}"
+      DATABASE_URL: "${DATABASE_URL}"
+      REDIS_URL: "${REDIS_URL}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      OPENAI_MODEL: "${OPENAI_MODEL:-gpt-4.1}"
+      CHATWOOT_URL: "${CHATWOOT_URL}"
+      CHATWOOT_API_TOKEN: "${CHATWOOT_API_TOKEN}"
+      CHATWOOT_ACCOUNT_ID: "${CHATWOOT_ACCOUNT_ID:-1}"
+      CHATWOOT_BOT_SENDER_ID: "${CHATWOOT_BOT_SENDER_ID}"
+      MIN_BUDGET: "${MIN_BUDGET:-5000}"
+      ADMIN_WHATSAPP: "${ADMIN_WHATSAPP}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sdr
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-changeme}"
+      POSTGRES_DB: sdr_agent
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations/001_initial.sql:/docker-entrypoint-initdb.d/001_initial.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sdr -d sdr_agent"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save "" --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:
